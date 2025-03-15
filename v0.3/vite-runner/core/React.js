@@ -14,7 +14,8 @@ function createElement(type, props, ...children) {
     props: {
       ...props,
       children: children.map((child) => {
-        return typeof child === 'string' ? createTextNode(child) : child
+        const isTextNode = typeof child === 'string' || typeof child === 'number'
+        return isTextNode ? createTextNode(child) : child
       }),
     }
   }
@@ -55,7 +56,16 @@ function commitRoot() {
 
 function commitWork(fiber) {
   if (!fiber) return
-  fiber.parent.dom.append(fiber.dom)
+
+  let fiberParent = fiber.parent
+  while (!fiberParent.dom) {
+    fiberParent = fiberParent.parent
+  }
+
+  if (fiber.dom) {
+    fiberParent.dom.append(fiber.dom)
+  }
+
   commitWork(fiber.child)
   commitWork(fiber.sibling)
 }
@@ -72,8 +82,7 @@ function updateProps(dom, props) {
   })
 }
 
-function initChildren(fiber) {
-  const children = fiber.props.children
+function initChildren(fiber, children) {
   let prevChild = null
   children.forEach((child, index) => {
     const newFiber = {
@@ -96,25 +105,30 @@ function initChildren(fiber) {
 }
 
 function performanceWorkOfUnit(fiber) {
-  if (!fiber.dom) {
-    const dom = (fiber.dom = createDom(fiber.type))
+  const isFunctionComponent = typeof fiber.type === 'function'
+  if (!isFunctionComponent) {
+    if (!fiber.dom) {
+      const dom = (fiber.dom = createDom(fiber.type))
 
-    // fiber.parent.dom.append(dom)
+      // fiber.parent.dom.append(dom)
 
-    updateProps(dom, fiber.props)
+      updateProps(dom, fiber.props)
+    }
   }
 
-  initChildren(fiber)
+  const children = isFunctionComponent ? [fiber.type(fiber.props)] : fiber.props.children
+  initChildren(fiber, children)
 
-  if (fiber.child) {
-    return fiber.child
+  if (fiber.child) return fiber.child
+
+
+  let nextFiber = fiber
+  while (nextFiber) {
+    if (nextFiber.sibling) return nextFiber.sibling
+    nextFiber = nextFiber.parent
   }
 
-  if (fiber.sibling) {
-    return fiber.sibling
-  }
-
-  return fiber.parent?.sibling
+  // return fiber.parent?.sibling
 }
 
 requestIdleCallback(workLoop)

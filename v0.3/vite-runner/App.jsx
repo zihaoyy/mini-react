@@ -1,12 +1,28 @@
-// js prigma
-/**@jsx CReact.createElement */
-import CReact from "./core/React.js"
+import React from "./core/React.js"
 
-const App = <div>hi-mini-react</div>
+function Counter({num}) {
+  return (
+    <div>count: {num}</div>
+  )
+}
 
-// function AppOne() {
-    // return <div>hi-mini-react</div>
-// }
-// console.log(AppOne)
+function CounterContainer() {
+  return (
+    <div>
+      counter container
+      <Counter num={10}/>
+      <Counter num={20}/>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <div>
+      hi-mini-react
+      <CounterContainer/>
+    </div>
+  )
+}
 
 export default App
