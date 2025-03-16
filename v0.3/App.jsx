@@ -1,18 +1,21 @@
 import React from "./core/React.js"
 
-let count = 10
 let showBar = false
 
 function Counter() {
-  const update = React.update()
+  const [count, setCount] = React.useState(10)
+  const [count2, setCount2] = React.useState(20)
   const handleAdd = () => {
     console.log('counter added')
-    count++
-    update()
+    setCount((prevCount) => prevCount + 1)
+    // setCount2((prevCount2) => prevCount2 + 1)
+    // setCount2(50)
+    setCount2(() => 50)
   }
   return (
     <div>
       count:{count}
+      <div>count2:{count2}</div>
       <button onClick={handleAdd}>add</button>
     </div>
   )
