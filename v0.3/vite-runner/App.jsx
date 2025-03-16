@@ -1,8 +1,23 @@
 import React from "./core/React.js"
 
-function Counter({num}) {
+let count = 10
+let props = {
+  id: '111111'
+}
+
+function Counter() {
+  const handleAdd = () => {
+    console.log('add')
+    props = {}
+    count++
+    React.update()
+  }
+
   return (
-    <div>count: {num}</div>
+    <div {...props}>
+      count: {count}
+      <button onClick={handleAdd}>Add</button>
+    </div>
   )
 }
 
@@ -11,7 +26,6 @@ function CounterContainer() {
     <div>
       counter container
       <Counter num={10}/>
-      <Counter num={20}/>
     </div>
   )
 }

@@ -22,16 +22,18 @@ function createElement(type, props, ...children) {
 }
 
 function render(el, container) {
-  nextWorkOfUnit = {
+  wipRoot = {
     dom: container,
     props: {
       children: [el]
     }
   }
-  root = nextWorkOfUnit
+  nextWorkOfUnit = wipRoot
 }
 
-let root = null
+// work in progress
+let wipRoot = null
+let currentRoot = null
 let nextWorkOfUnit = null
 
 function workLoop(deadline) {
@@ -42,7 +44,7 @@ function workLoop(deadline) {
     shouldYield = deadline.timeRemaining() < 1
   }
 
-  if (!nextWorkOfUnit && root) {
+  if (!nextWorkOfUnit && wipRoot) {
     commitRoot()
   }
 
@@ -50,8 +52,9 @@ function workLoop(deadline) {
 }
 
 function commitRoot() {
-  commitWork(root.child)
-  root = null
+  commitWork(wipRoot.child)
+  currentRoot = wipRoot
+  wipRoot = null
 }
 
 function commitWork(fiber) {
@@ -60,6 +63,12 @@ function commitWork(fiber) {
   let fiberParent = fiber.parent
   while (!fiberParent.dom) {
     fiberParent = fiberParent.parent
+  }
+
+  if (fiber.effectTag === 'update') {
+    updateProps(fiber.dom, fiber.props, fiber.alternate?.props)
+  } else if (fiber.effectTag === 'placement') {
+
   }
 
   if (fiber.dom) {
@@ -74,24 +83,63 @@ function createDom(type) {
   return type === "TEXT_ELEMENT" ? document.createTextNode('') : document.createElement(type)
 }
 
-function updateProps(dom, props) {
-  Object.keys(props).forEach((key) => {
+function updateProps(dom, nextProps, prevProps) {
+  Object.keys(prevProps).forEach(key => {
     if (key !== 'children') {
-      dom[key] = props[key]
+      if (!(key in nextProps)) {
+        dom.removeAttribute(key)
+      }
+    }
+  })
+
+  Object.keys(nextProps).forEach((key) => {
+    if (key !== 'children') {
+      if (nextProps[key] !== prevProps[key]) {
+        if (key.startsWith('on')) {
+          const eventType = key.slice(2).toLowerCase()
+          document.removeEventListener(eventType, prevProps[key])
+          document.addEventListener(eventType, nextProps[key])
+        } else {
+          dom[key] = nextProps[key]
+        }
+      }
     }
   })
 }
 
-function initChildren(fiber, children) {
+function reconcileChildren(fiber, children) {
+  let oldFiber = fiber.alternate?.child
   let prevChild = null
   children.forEach((child, index) => {
-    const newFiber = {
-      type: child.type,
-      props: child.props,
-      child: null,
-      parent: fiber,
-      sibling: null,
-      dom: null,
+    const isSameType = oldFiber && oldFiber.type === child.type
+    let newFiber
+    if (isSameType) {
+      // update
+      newFiber = {
+        type: child.type,
+        props: child.props,
+        child: null,
+        parent: fiber,
+        sibling: null,
+        dom: oldFiber.dom,
+        effectTag: 'update',
+        alternate: oldFiber
+      }
+    } else {
+      // create
+      newFiber = {
+        type: child.type,
+        props: child.props,
+        child: null,
+        parent: fiber,
+        sibling: null,
+        dom: null,
+        effectTag: 'placement'
+      }
+    }
+
+    if (oldFiber) {
+      oldFiber = oldFiber.sibling
     }
 
     if (index === 0) {
@@ -106,16 +154,16 @@ function initChildren(fiber, children) {
 
 function updateFunctionComponent(fiber) {
   const children = [fiber.type(fiber.props)]
-  initChildren(fiber, children)
+  reconcileChildren(fiber, children)
 }
 
 function updateHostComponent(fiber) {
   if (!fiber.dom) {
     const dom = (fiber.dom = createDom(fiber.type))
-    updateProps(dom, fiber.props)
+    updateProps(dom, fiber.props, {})
   }
   const children = fiber.props.children
-  initChildren(fiber, children)
+  reconcileChildren(fiber, children)
 }
 
 function performanceWorkOfUnit(fiber) {
@@ -133,13 +181,21 @@ function performanceWorkOfUnit(fiber) {
     if (nextFiber.sibling) return nextFiber.sibling
     nextFiber = nextFiber.parent
   }
-
-  // return fiber.parent?.sibling
 }
 
 requestIdleCallback(workLoop)
 
+function update() {
+  wipRoot = {
+    dom: currentRoot.dom,
+    props: currentRoot.props,
+    alternate: currentRoot
+  }
+  nextWorkOfUnit = wipRoot
+}
+
 const React = {
+  update,
   render,
   createElement,
 }
