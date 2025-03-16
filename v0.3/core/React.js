@@ -60,9 +60,47 @@ function workLoop(deadline) {
 function commitRoot() {
   deletions.forEach(commitDeletion)
   commitWork(wipRoot.child)
+  commitEffectHooks()
   currentRoot = wipRoot
   wipRoot = null
   deletions = []
+}
+
+function commitEffectHooks() {
+  function run(fiber) {
+    if (!fiber) return
+
+    if (!fiber.alternate) {
+      // init
+      fiber.effectHooks?.forEach(hook => hook.cleanup = hook.callback())
+    } else {
+      // update
+      fiber.effectHooks?.forEach((newHook, index) => {
+        if (newHook.deps.length > 0) {
+          const oldEffectHook = fiber.alternate?.effectHooks[index]
+          const needUpdate = oldEffectHook?.deps.some((oldDep, i) => oldDep !== newHook.deps[i])
+          needUpdate && (newHook.cleanup = newHook.callback())
+        }
+      })
+    }
+
+    run(fiber.child)
+    run(fiber.sibling)
+  }
+
+  function runCleanUp(fiber) {
+    if (!fiber) return
+    fiber.alternate?.effectHooks?.forEach((hook) => {
+      if (hook.deps.length > 0) {
+        hook.cleanup && hook.cleanup()
+      }
+    })
+    runCleanUp(fiber.child)
+    runCleanUp(fiber.sibling)
+  }
+
+  runCleanUp(wipRoot)
+  run(wipRoot)
 }
 
 function commitDeletion(fiber) {
@@ -107,10 +145,8 @@ function addEvents(dom, name, fn) {
 
 function updateProps(dom, nextProps, prevProps) {
   Object.keys(prevProps).forEach(key => {
-    if (key !== 'children') {
-      if (!(key in nextProps)) {
-        dom.removeAttribute(key)
-      }
+    if (key !== 'children' && !(key in nextProps)) {
+      dom.removeAttribute(key)
     }
   })
 
@@ -208,6 +244,7 @@ function reconcileChildren(fiber, children) {
 function updateFunctionComponent(fiber) {
   stateHooks = []
   stateHookIndex = 0
+  effectHooks = []
   wipFiber = fiber
 
   const children = [fiber.type(fiber.props)]
@@ -288,10 +325,24 @@ function useState(initial) {
   return [stateHook.state, setState]
 }
 
+let effectHooks
+
+function useEffect(callback, deps) {
+  const effectHook = {
+    callback,
+    deps,
+    cleanup: undefined
+  }
+  effectHooks.push(effectHook)
+
+  wipFiber.effectHooks = effectHooks
+}
+
 const React = {
   update,
   render,
   useState,
+  useEffect,
   createElement,
 }
 

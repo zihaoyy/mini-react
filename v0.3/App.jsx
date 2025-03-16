@@ -5,8 +5,24 @@ let showBar = false
 function Counter() {
   const [count, setCount] = React.useState(10)
   const [count2, setCount2] = React.useState(20)
+
+  React.useEffect(() => {
+    console.log('Counter init')
+
+    return () => {
+      console.log('cleanup 0')
+    }
+  }, [])
+
+  React.useEffect(() => {
+    console.log('count update')
+
+    return () => {
+      console.log('cleanup 1')
+    }
+  }, [count])
+
   const handleAdd = () => {
-    console.log('counter added')
     setCount((prevCount) => prevCount + 1)
     // setCount2((prevCount2) => prevCount2 + 1)
     // setCount2(50)
